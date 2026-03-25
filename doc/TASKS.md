@@ -9,11 +9,28 @@
 
 ## 🔧 环境搭建
 
-- [ ] **本地环境搭建** - 安装依赖、配置.env.local、启动开发服务器
-- [ ] **数据库初始化** - 在Supabase执行所有建表SQL（参考for-review/database.md）
-- [ ] **Cloudflare R2配置** - 创建bucket、生成API keys
-- [ ] **Gemini API配置** - 获取API key、测试调用
+- [ ] **本地环境搭建**
+  - [ ] 1.1 配置Podman兼容Docker
+  - [ ] 1.2 安装Supabase CLI
+  - [ ] 1.3 初始化Supabase项目（`supabase init`）
+  - [ ] 1.4 启动本地Supabase服务（`supabase start`）
+  - [ ] 1.5 执行数据库迁移SQL（创建所有表）
+  - [ ] 1.6 配置Supabase Auth（OAuth + Inbucket邮件测试）
+  - [ ] 1.7 注册Lemon Squeezy测试账号
+  - [ ] 1.8 创建.env.local文件（所有环境变量）
+  - [ ] 1.9 安装Node.js依赖（`npm install`）
+  - [ ] 1.10 启动Next.js开发服务器（`npm run dev`）
+  - [ ] 1.11 验证：访问http://localhost:3000
+  - [ ] 1.12 验证：Inbucket邮件测试（http://localhost:54324）
+  
 - [ ] **线上环境部署** - Vercel部署、配置环境变量、连接域名
+  - [ ] 2.1 创建Supabase云服务项目
+  - [ ] 2.2 创建Cloudflare R2 bucket
+  - [ ] 2.3 配置Lemon Squeezy生产环境
+  - [ ] 2.4 Vercel连接GitHub仓库
+  - [ ] 2.5 配置Vercel环境变量
+  - [ ] 2.6 首次部署测试
+  - [ ] 2.7 配置自定义域名
 
 ---
 
