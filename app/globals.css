@@ -1,0 +1,30 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --brand-blue: #1E40AF;
+  --brand-blue-dark: #1836A0;
+  --brand-blue-light: #EFF6FF;
+  --brand-green: #10B981;
+  --brand-green-dark: #059669;
+  --brand-green-light: #ECFDF5;
+  --color-bg: #FFFFFF;
+  --color-section: #F8FAFC;
+  --color-text: #0F172A;
+  --color-muted: #475569;
+  --color-subtle: #94A3B8;
+  --color-border: #E2E8F0;
+  --color-fill: #F1F5F9;
+}
+
+body {
+  color: var(--color-text);
+  background: var(--color-bg);
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}

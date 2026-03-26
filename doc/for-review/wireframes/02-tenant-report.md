@@ -297,7 +297,7 @@
 ## API
 
 ### POST /api/public/properties/[slug]/tickets
-**说明**：租客提交工单
+**说明**：租客提交工单，成功后异步发送邮件通知给房东
 
 **请求**：
 ```typescript
@@ -315,6 +315,8 @@
 **响应**：
 - 成功：`201 Created` + 工单ID
 - 房产不存在：`404 Not Found` + `{ error: 'Property not found' }`
+
+**邮件发送时机**：工单写入数据库成功后，fire-and-forget 发送（邮件失败不影响接口返回）
 
 ---
 
@@ -639,4 +641,121 @@ const generateUniqueSlug = async (address: string) => {
   
   return slug;
 };
+```
+
+---
+
+## 邮件通知
+
+### 触发时机
+
+租客通过 `POST /api/public/properties/[slug]/tickets` 成功提交工单后，**异步**向房东发送通知邮件。
+
+- 邮件发送是 fire-and-forget：发送失败不影响工单创建，不向租客暴露任何错误
+- 通过 `ticket_id` 写入后立即触发，在同一个 API route handler 内调用
+
+---
+
+### 收件人
+
+从数据库获取：
+
+```typescript
+// properties.landlord_id → users.email
+const { data: landlord } = await supabase
+  .from("users")
+  .select("email, full_name")
+  .eq("id", property.landlord_id)
+  .single();
+```
+
+---
+
+### 邮件内容规格
+
+#### Subject
+
+```
+[Emergency] New repair request — {property_address}   // is_emergency = true
+New repair request — {property_address}               // is_emergency = false
+```
+
+#### Body（纯文本 + HTML 双格式）
+
+```
+你好 {landlord_name}，
+
+你的房产收到了一条新的维修请求：
+
+房产地址：{property_address}
+提交时间：{submitted_at}
+紧急程度：{is_emergency ? "🚨 紧急" : "普通"}
+
+问题描述：
+{tenant_raw_text}
+
+——————————————
+租客联系信息（如有填写）：
+姓名：{tenant_name || "未提供"}
+邮箱：{tenant_email || "未提供"}
+电话：{tenant_phone || "未提供"}
+——————————————
+
+点击查看工单详情：
+{app_url}/dashboard/tickets/{ticket_id}
+
+——
+StoopKeep · 自动通知邮件，请勿回复
+```
+
+---
+
+### 邮件服务
+
+使用 **Resend**（`resend` npm 包）：
+- 免费额度：100 封/天，3000 封/月
+- 适合 Next.js 服务端 API route 调用
+- 官方文档：https://resend.com/docs
+
+**所需环境变量**（`.env.local`）：
+
+```bash
+RESEND_API_KEY=re_xxxxxxxxxxxx
+RESEND_FROM_EMAIL=noreply@yourdomain.com   # 需要在 Resend 验证域名
+```
+
+> 本地开发：`RESEND_API_KEY` 留空时跳过发送，只在 console 打印日志
+
+---
+
+### 实现位置
+
+```
+lib/email/sendNewTicketNotification.ts   // 邮件发送函数（封装 Resend 调用）
+app/api/public/properties/[slug]/tickets/route.ts  // POST handler 末尾调用
+```
+
+---
+
+### 数据获取流程
+
+```
+POST /api/public/properties/[slug]/tickets
+  ↓
+1. 查询 property（已有）→ 获取 property.landlord_id, property.address
+2. 插入 ticket → 获取 ticket.id
+3. 查询 users WHERE id = property.landlord_id → 获取 landlord.email
+4. sendNewTicketNotification(...)   ← fire-and-forget（不 await 或 try-catch）
+5. return 201
+```
+
+---
+
+### 错误处理
+
+```typescript
+// 不阻塞主流程，捕获后只记录日志
+sendNewTicketNotification({...}).catch((err) => {
+  console.error("[email] Failed to send new ticket notification:", err);
+});
 ```

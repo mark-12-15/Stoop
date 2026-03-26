@@ -451,17 +451,123 @@ const handleSubscribe = (interval: 'month' | 'year') => {
 ### 降级后处理
 
 **超过Free配额的处理逻辑**：
-- **超过3个房产**：禁止添加新房产，现有保留（只读）
+- **超过3个房产**：采用 **Auto-Freeze with Swap** 策略（见下方详细说明）
 - **超过3个租客工单**：停止接收新提交，现有保留
 - **导出**：限制为3条
 - **超过100MB存储**：禁止上传新文件，现有保留（显示警告）
 
-**降级后的提示Banner**（Dashboard顶部）：
+---
+
+### 房产降级策略：Auto-Freeze with Swap
+
+> **背景**：租客通过公开 URL 提交工单，若不强制执行限额，房东可无视警告继续对所有房产收票。因此必须在系统层面强制执行。
+
+#### 1. 系统自动处理（降级触发时）
+
+- 系统自动保留**最早创建的3个**房产为 Active
+- 其余房产状态自动变更为 **Frozen**
+- 全程无需房东手动选择
+
+#### 2. 租客公开页行为（`/r/[slug]`）
+
+**Active 房产** → 正常展示工单提交表单（无变化）
+
+**Frozen 房产** → 隐藏表单，显示暂停提示：
+
 ```
-⚠️ Your Pro plan expired. You have 5 properties (Free allows 3).
-You can't add new properties until you upgrade.
-[Upgrade to Pro →]  [Dismiss]
+┌─────────────────────────────────────────┐
+│                                         │
+│           🔒                            │
+│                                         │
+│   This maintenance portal is            │
+│   currently paused.                     │
+│                                         │
+│   Please contact your landlord          │
+│   directly for repair requests.         │
+│                                         │
+└─────────────────────────────────────────┘
 ```
+
+#### 3. 房东 Dashboard Banner
+
+降级后 Dashboard 顶部显示（不可 Dismiss，直到恢复正常）：
+
+```
+┌──────────────────────────────────────────────────────────┐
+│ ⚠️ Your plan is now Free. 2 properties have been paused  │
+│    to meet the 3-property limit.                         │
+│    [Manage Properties]      [Upgrade to Pro →]           │
+└──────────────────────────────────────────────────────────┘
+```
+
+#### 4. 房产列表页（Frozen 状态展示）
+
+Frozen 房产在列表中以灰色哑光样式展示，带 🔒 标记：
+
+```
+┌──────────────────────────────────────────────────────────┐
+│  Properties                          [+ Add Property]    │
+├──────────────────────────────────────────────────────────┤
+│                                                          │
+│  ┌──────────────────────────────────────────────────┐   │
+│  │ ✅ 123 Main St, Apt 2B          [View] [Tickets] │   │
+│  │    Active · 3 open tickets                       │   │
+│  └──────────────────────────────────────────────────┘   │
+│                                                          │
+│  ┌──────────────────────────────────────────────────┐   │
+│  │ ✅ 456 Oak Ave                  [View] [Tickets] │   │
+│  │    Active · 1 open ticket                        │   │
+│  └──────────────────────────────────────────────────┘   │
+│                                                          │
+│  ┌──────────────────────────────────────────────────┐   │
+│  │ ✅ 789 Pine St                  [View] [Tickets] │   │
+│  │    Active · 0 open tickets                       │   │
+│  └──────────────────────────────────────────────────┘   │
+│                                                          │
+│  ┌──────────────────────────────────────────────────┐   │
+│  │ 🔒 321 Elm St          [Swap to Active] [View]   │   │  ← 灰色哑光
+│  │    Frozen · Tenant portal paused                 │   │
+│  └──────────────────────────────────────────────────┘   │
+│                                                          │
+│  ┌──────────────────────────────────────────────────┐   │
+│  │ 🔒 654 Maple Ave       [Swap to Active] [View]   │   │  ← 灰色哑光
+│  │    Frozen · Tenant portal paused                 │   │
+│  └──────────────────────────────────────────────────┘   │
+│                                                          │
+└──────────────────────────────────────────────────────────┘
+```
+
+#### 5. Swap 机制
+
+房东点击 Frozen 房产的 **[Swap to Active]** 时，弹出选择框，要求先选一个 Active 房产换下来（始终保持 ≤ 3 个 Active）：
+
+```
+┌─────────────────────────────────────────┐
+│  Swap Property                  [X]     │
+├─────────────────────────────────────────┤
+│                                         │
+│  To activate 321 Elm St, you must       │
+│  pause one of your active properties.   │
+│                                         │
+│  Choose one to pause:                   │
+│                                         │
+│  ○  123 Main St, Apt 2B                 │
+│  ○  456 Oak Ave                         │
+│  ○  789 Pine St                         │
+│                                         │
+│  [Cancel]       [Confirm Swap]          │
+│                                         │
+└─────────────────────────────────────────┘
+```
+
+Swap 完成后：
+- 所选 Active 房产变为 Frozen（租客链接显示暂停）
+- 目标 Frozen 房产变为 Active（租客链接恢复正常）
+- Toast 提示："Property swapped successfully."
+
+#### 6. 升级恢复（Free → Pro）
+
+升级成功后，系统自动将所有 Frozen 房产恢复为 Active，无需房东任何操作。Dashboard 降级 Banner 同步消失。
 
 ---
 

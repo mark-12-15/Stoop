@@ -161,7 +161,7 @@ Dashboard基于房东的核心关注点设计：
 │  💡 Did you handle repairs yourself?        │
 │  Add them now to maximize your deductions.  │
 │                                             │
-│  [+ Add Repair Records] [Dismiss]          │
+│  [+ Log Expense]  [···]                     │ ← [···] 打开 Action Sheet
 │                                             │
 ├─────────────────────────────────────────────┤
 │                                             │
@@ -170,35 +170,112 @@ Dashboard基于房东的核心关注点设计：
 └─────────────────────────────────────────────┘
 ```
 
-**显示逻辑**：
-```typescript
-const currentMonth = new Date().getMonth(); // 0=1月, 3=4月
-const showTaxBanner = currentMonth >= 0 && currentMonth <= 3; // 1-4月显示
+**[···] Dismiss Action Sheet**（点击后从底部弹出）：
+```
+┌─────────────────────────────────────────────┐
+│  Remind me later?                           │
+├─────────────────────────────────────────────┤
+│  [🔔 Remind me in 4 weeks]                 │ ← snooze 4周
+│  [✅ I've already filed my 2025 taxes]     │ ← 本税年永久关闭
+├─────────────────────────────────────────────┤
+│  [Cancel]                                   │
+└─────────────────────────────────────────────┘
+```
 
-const currentYear = new Date().getFullYear();
+### Banner 状态降级
+
+随着时间推移，Banner 的展示形态会发生变化，以避免用户产生"提醒疲劳"：
+
+| 阶段 | 触发条件 | 展示形态 | 颜色 |
+|------|---------|---------|------|
+| **全量 Banner** | 1月1日 – 3月31日，未 snooze | 完整横幅（见上方设计） | 蓝色（informational） |
+| **小胶囊 Chip** | 已 snooze、snooze 未到期 | 标题栏下方一行小提示："📄 2025 tax reminder snoozed · [View]" | 灰色 |
+| **橙色 Banner** | 4月1日起，且未标记"已报税" | 完整横幅重新出现，颜色升级为橙色，文案改为 "⚠️ Tax deadline is approaching — April 15." | 橙色（warning） |
+| **完全隐藏** | 已点击"I've already filed" | 本税年内完全不显示 | — |
+
+**关键规则**：4月1日起强制重新浮出，即使处于 snooze 状态也会被覆盖（snooze 只在1月–3月有效）。
+
+### 显示逻辑
+
+```typescript
+const today = new Date();
+const currentMonth = today.getMonth(); // 0=1月, 3=4月
+const isTaxSeason = currentMonth >= 0 && currentMonth <= 3; // 1-4月显示
+
+const currentYear = today.getFullYear();
 const taxYear = currentYear - 1; // 1-4月报去年的税
 
-const taxYearTickets = tickets.filter(t => 
+// ⚠️ 关键前提：只有 properties.length > 0 时才显示报税季提醒
+// 空状态（无房产）时完全隐藏，聚焦于 Add Property 引导
+const showTaxBanner = isTaxSeason && propertiesCount > 0;
+
+// 用户偏好（存储在 user_preferences 或 localStorage）
+const taxYearDone: boolean;       // 用户点击"I've already filed"
+const snoozeUntil: Date | null;   // snooze到期时间
+
+const isAprilDeadlineZone = currentMonth === 3; // 4月
+const isSnoozed = snoozeUntil != null && today < snoozeUntil && !isAprilDeadlineZone;
+
+// Banner 状态
+type TaxBannerState = "full" | "chip" | "orange" | "hidden";
+
+function getTaxBannerState(): TaxBannerState {
+  if (!showTaxBanner) return "hidden";
+  if (taxYearDone) return "hidden";         // 已报税，永久隐藏
+  if (isAprilDeadlineZone) return "orange"; // 4月，强制橙色 Banner
+  if (isSnoozed) return "chip";             // snooze中，小胶囊
+  return "full";                            // 默认全量 Banner
+}
+
+// Snooze处理
+function handleSnooze() {
+  const fourWeeksLater = new Date();
+  fourWeeksLater.setDate(fourWeeksLater.getDate() + 28);
+  setSnoozeUntil(fourWeeksLater); // 写入 user_preferences
+}
+
+// 永久关闭
+function handleAlreadyFiled() {
+  setTaxYearDone(true); // 写入 user_preferences，key: `tax_${taxYear}_filed`
+}
+
+const taxYearTickets = tickets.filter(t =>
   new Date(t.closed_at).getFullYear() === taxYear
 );
 
 if (showTaxBanner && taxYearTickets.length === 0) {
-  // 显示"无工单"提示，引导手动添加
+  // 显示"无工单"提示，引导手动添加（Log Expense）
 }
 ```
 
 ---
 
-## 4C. 空状态（首次登录）
+## 4C. 空状态（首次登录 / properties.length === 0）
+
+**触发条件**：`propertiesCount === 0`（不是 tickets === 0）
+
+**隐藏内容**：报税季提醒 Banner、StatCards、FreePlanBanner、RecentActivity 全部隐藏，页面 100% 聚焦于 Add Property 引导。
 
 ```
 ┌─────────────────────────────────────────────┐
-│  👋 Welcome to StoopKeep!                    │
+│  [Logo] StoopKeep                 [👤 John ▼]│
+├─────────────────────────────────────────────┤
 │                                             │
-│  Let's get started by adding your          │
-│  first property.                            │
+│  Dashboard                                  │
 │                                             │
-│  [ + Add Property ]                         │
+│        ┌──────────────────────┐             │
+│        │   [🏠 house icon]    │             │
+│        │                      │             │
+│        │  Welcome to          │             │
+│        │  StoopKeep!          │             │
+│        │                      │             │
+│        │  Let's get started   │             │
+│        │  by adding your      │             │
+│        │  first property.     │             │
+│        │                      │             │
+│        │  [+ Add Property]    │             │
+│        └──────────────────────┘             │
+│                                             │
 └─────────────────────────────────────────────┘
 ```
 
@@ -224,6 +301,20 @@ if (showTaxBanner && taxYearTickets.length === 0) {
 | **"2/3 tickets used"** | Free用户 | 纯文本，不可点击 | - |
 | **[Upgrade]** | Free用户 | 跳转到定价页 | `/pricing` |
 | *(整行不显示)* | Pro用户 | - | - |
+
+### 报税季 Banner 按钮
+
+| 元素 | 显示条件 | 点击行为 | 目标 |
+|------|---------|---------|------|
+| **[+ Log Expense]** | 无工单提示中 | 跳转到添加支出记录 | `/finances/new`（或弹窗） |
+| **[···]** | 无工单提示中 | 弹出 Action Sheet | 见下方 |
+| **[🔔 Remind me in 4 weeks]** | Action Sheet 中 | Snooze 28天，Banner 降为 Chip | 写入 `user_preferences.snooze_until` |
+| **[✅ I've already filed]** | Action Sheet 中 | 本税年永久关闭 Banner | 写入 `user_preferences.tax_{year}_filed = true` |
+| **[Cancel]** | Action Sheet 中 | 关闭 Action Sheet | 无状态变更 |
+| **[Export 2025 Schedule E]** | 有工单提示中 | 导出 Schedule E | `/api/export/schedule-e?year=2025` |
+| **[Add Receipts]** | 有工单提示中 | 查看缺票据工单 | `/tickets?filter=pending_receipt` |
+
+**注意**：旧版的 `[+ Add Repair Records]` 按钮已重命名为 `[+ Log Expense]`，并统一归属于 Finances 模块入口。
 
 ### 统计卡片按钮
 
@@ -271,7 +362,8 @@ Dashboard卡片 → 点击[View All] → 工单列表页
 - `DashboardHeader` - 顶部导航（带下拉菜单）
 - `UserDropdown` - 用户头像下拉菜单
 - `StatCard` - 统计卡片（4个）
-- `TaxSeasonBanner` - 报税季提醒（1-4月显示）
+- `TaxSeasonBanner` - 报税季提醒（1-4月显示），支持四种状态：`full`（蓝色全量）、`chip`（snooze中）、`orange`（4月倒计时）、`hidden`（已报税/无属性）
+- `TaxDismissActionSheet` - 点击 `[···]` 后弹出的选择器，包含 Snooze / Already Filed / Cancel 三个选项
 - `RecentActivity` - 最近活动列表（显示最近5条）
 - `TicketCard` - 工单卡片（可点击打开详情）
 

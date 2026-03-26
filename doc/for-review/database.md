@@ -97,8 +97,15 @@ CREATE TABLE properties (
   
   -- 附加信息
   notes TEXT,
-  is_active BOOLEAN DEFAULT true,
-  
+
+  -- 房产状态
+  -- active:   正常运营，租客可提交工单
+  -- frozen:   因降级被系统自动冻结，租客链接显示"暂停"；可通过 Swap 机制换回 active
+  -- inactive: 房东手动删除（软删除）
+  status VARCHAR(20) DEFAULT 'active' CHECK (
+    status IN ('active', 'frozen', 'inactive')
+  ),
+
   -- 时间戳
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -107,7 +114,8 @@ CREATE TABLE properties (
 -- 索引
 CREATE INDEX idx_properties_landlord_id ON properties(landlord_id);
 CREATE INDEX idx_properties_slug ON properties(slug);
-CREATE INDEX idx_properties_is_active ON properties(is_active);
+CREATE INDEX idx_properties_status ON properties(status);
+CREATE INDEX idx_properties_landlord_status ON properties(landlord_id, status); -- 升级恢复/降级冻结时用
 
 -- 自动生成 slug 的触发器
 CREATE OR REPLACE FUNCTION generate_property_slug()
