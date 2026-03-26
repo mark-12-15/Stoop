@@ -63,7 +63,7 @@ export default function UserDropdown({ email, initials, avatarUrl }: Props) {
               Dashboard
             </Link>
             <Link
-              href="/dashboard/properties"
+              href="/properties"
               className="block px-4 py-2 text-sm text-[#1A1A18] hover:bg-fill transition-colors"
               onClick={() => setOpen(false)}
             >

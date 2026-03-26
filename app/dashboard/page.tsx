@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
@@ -8,6 +9,7 @@ import RecentActivity, { type ActivityTicket } from "@/components/dashboard/Rece
 import EmptyState from "@/components/dashboard/EmptyState";
 import UpgradeSuccessToast from "@/components/dashboard/UpgradeSuccessToast";
 import FrozenPropertiesBanner from "@/components/dashboard/FrozenPropertiesBanner";
+import TicketModal from "@/components/tickets/TicketModal";
 
 export const metadata = { title: "Dashboard — StoopKeep" };
 
@@ -21,7 +23,7 @@ type Profile = {
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: { upgraded?: string };
+  searchParams: { upgraded?: string; ticket?: string };
 }) {
   const supabase = createClient();
   const { data: { session } } = await supabase.auth.getSession();
@@ -149,6 +151,9 @@ export default async function DashboardPage({
           )}
         </main>
       </div>
+      <Suspense fallback={null}>
+        <TicketModal />
+      </Suspense>
     </div>
   );
 }

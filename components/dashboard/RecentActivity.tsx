@@ -1,4 +1,5 @@
 import Link from "next/link";
+// Note: card links use /dashboard?ticket= to open the TicketModal
 
 type Property = { address: string; unit_number: string | null };
 export type ActivityTicket = {
@@ -46,7 +47,11 @@ export default function RecentActivity({ tickets }: { tickets: ActivityTicket[] 
             : t.properties?.address ?? "";
 
           return (
-            <div key={t.id} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+            <Link
+              key={t.id}
+              href={`/dashboard?ticket=${t.id}`}
+              className="block bg-white rounded-xl border border-gray-100 shadow-sm p-4 hover:border-blue-200 transition-colors"
+            >
               <div className="flex items-start gap-3">
                 <span className="text-base shrink-0 mt-0.5">{icon}</span>
                 <div className="flex-1 min-w-0">
@@ -55,14 +60,13 @@ export default function RecentActivity({ tickets }: { tickets: ActivityTicket[] 
                     {loc && <>{loc} · </>}{label} · {timeAgo(t.updated_at)}
                   </p>
                   {t.status === "pending_receipt" && (
-                    <Link href={`/tickets/${t.id}`}
-                      className="inline-block mt-1.5 text-xs font-semibold text-amber-600 hover:text-amber-700">
+                    <span className="inline-block mt-1.5 text-xs font-semibold text-amber-600">
                       Upload Receipt →
-                    </Link>
+                    </span>
                   )}
                 </div>
               </div>
-            </div>
+            </Link>
           );
         })}
       </div>
